@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arrange the Sentence</title>
+    <style>
+        /* Base Kid-Friendly Styles */
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Nunito', sans-serif;
+            background-color: #f4f9ff;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #ff8b94;
+            text-shadow: 2px 2px 0px #ffe1e4;
+            margin-bottom: 5px;
+            font-size: 2.5rem;
+            text-align: center;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .score-counter {
+            background: #baffc9;
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 2px solid #82d495;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Word Bank Area */
+        .word-bank {
+            position: relative;
+            width: 100%;
+            height: 350px;
+            background-color: #e0f7fa;
+            border: 4px dashed #81d4fa;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.05);
+        }
+
+        .word-bank::before {
+            content: 'Word Bank (Drag from here)';
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            color: #81d4fa;
+            font-weight: bold;
+            font-size: 1.1rem;
+            pointer-events: none;
+        }
+
+        /* Drop Zone (Sentence Area) */
+        .drop-zone {
+            min-height: 120px;
+            background-color: #fff9c4;
+            border: 4px dashed #fff176;
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.05);
+            transition: background-color 0.3s;
+        }
+
+        .drop-zone.drag-over {
+            background-color: #fffae6;
+            border-color: #ffeb3b;
+        }
+
+        /* Word Cards */
+        .word-card {
+            padding: 12px 24px;
+            border-radius: 15px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #444;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.15);
+            transition: transform 0.1s;
+            touch-action: none;
+        }
+
+        .word-card:active {
+            cursor: grabbing;
+        }
+
+        .word-card.dragging {
+            opacity: 0.5;
+            box-shadow: none;
+        }
+
+        /* State classes for words */
+        .in-bank {
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform;
+        }
+
+        .in-drop-zone {
+            position: relative;
+            transform: none !important; /* Overrides physics translation */
+            top: auto;
+            left: auto;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.2rem;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.15);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 rgba(0,0,0,0.15);
+        }
+
+        .btn-check { background-color: #baffc9; color: #2e7d32; }
+        .btn-reset { background-color: #ffdfba; color: #e65100; }
+        .btn-next { background-color: #bae1ff; color: #0d47a1; display: none; }
+
+        .feedback {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            min-height: 40px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Arrange the Sentence</h1>
+    
+    <div class="stats-bar">
+        <div>Level: <span id="level-display">1</span>/10</div>
+        <div class="score-counter">Score: <span id="score-display">0</span></div>
+    </div>
+
+    <div class="game-container">
+        <div class="word-bank" id="word-bank"></div>
+        <div class="drop-zone" id="drop-zone"></div>
+        <div class="feedback" id="feedback"></div>
+
+        <div class="controls">
+            <button class="btn-reset" id="btn-reset">↺ Reset</button>
+            <button class="btn-check" id="btn-check">✓ Check Answer</button>
+            <button class="btn-next" id="btn-next">Next Level ➔</button>
+        </div>
+    </div>
+
+    <script>
+        // Todas las oraciones extraídas del PDF
+        const allSentences = [
+            "It's on the table", "It's under the window", "It's behind the door", "It's in the school bag", 
+            "It's on the bookcase", "It's in the cupboard", "Where's the pencil?", "The pencil is under the rug", 
+            "Where's the plant?", "The plant is on the chair", "Where's the car?", "The car is in the cupboard", 
+            "Where's the book?", "The book is in the bookcase", "Where's the doll?", "The doll is in the hall", 
+            "The girl is in the bedroom", "The dog is in the garden", "Mum is in the living room", "Dad is in the bathroom",
+            "I can play the guitar", "I can do karate", "I can paint", "I can juggle", "I can't ride a bike", 
+            "I can't sing", "I can't dance", "I can't make models", "Can you ride a bike? Yes, I can", 
+            "Can you do karate? No, I can't", "Can you paint? Yes, I can", "Can you play the guitar? No, I can't", 
+            "Can you juggle? Yes, I can", "Can you sing? No, I can't", "Can you dance? Yes, I can", 
+            "Can you make models? No, I can't", "I can swim", "I can jump", "I can run", "I can turn around",
+            "What are you wearing?", "I am wearing a pink dress", "I am wearing a red hat", "I am wearing a yellow T-shirt", 
+            "I am wearing a brown coat", "I'm wearing a yellow shirt", "I'm wearing a white jumper", "I'm wearing a purple skirt", 
+            "I'm wearing black trousers", "I'm wearing blue jeans", "I'm wearing green shorts", "I'm wearing grey shoes", 
+            "I'm wearing a coat and a dress", "I'm wearing a hat and jeans", "I'm wearing trousers and a jacket", 
+            "It is sunny", "It is cloudy", "It's raining", "It's snowing", "It's windy",
+            "It's a red bird", "It's a blue butterfly", "It's a brown squirrel", "It's a white duck", 
+            "It's a green frog", "It's a big lizard", "It's a small bat", "It's a small hedgehog", 
+            "A bat can fly", "A squirrel can climb", "A bird can't swim", "It can run", "It can sing", 
+            "It can't jump", "It can't swim", "Can it run? Yes, it can", "Can it fly? No, it can't", 
+            "Can it sing? Yes, it can", "Can it swim? Yes, it can", "Can it jump? No, it can't",
+            "I am fast", "I am scary", "I am clever", "I am tall", "He is strong", "He is thin", 
+            "He is invisible", "He is fast", "She is scary", "She is clever", "She is tall", "She is short", 
+            "Is he is strong? Yes, he is", "Is she is thin? Yes, she is", "Is she invisible? No, she isn't", 
+            "Is he scary? No, he isn't", "She is wearing red boots", "He is wearing a black belt", 
+            "She is wearing a yellow cape", "I am wearing a blue mask",
+            "What are you doing?", "I am talking", "I am drinking water", "I am eating a banana", 
+            "I'm reading a book", "I'm taking photos", "I'm listening to music", "I'm drawing a monster", 
+            "I'm writing my name", "He's talking", "He's drinking milk", "She's eating a pizza", 
+            "She's reading a comic", "He's taking photos", "She's listening to music", "He's drawing a house", 
+            "She's swimming", "She's jumping", "He's running", "He's dancing"
+        ];
+        
+        const pastelColors = ['#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#bae1ff', '#e8b9ff', '#ffd1dc'];
+        
+        // State
+        let currentSessionSentences = [];
+        let currentLevel = 0;
+        let score = 0;
+        let wordsData = []; 
+        let animationFrameId;
+
+        // DOM Elements
+        const wordBank = document.getElementById('word-bank');
+        const dropZone = document.getElementById('drop-zone');
+        const feedback = document.getElementById('feedback');
+        const btnCheck = document.getElementById('btn-check');
+        const btnReset = document.getElementById('btn-reset');
+        const btnNext = document.getElementById('btn-next');
+        const levelDisplay = document.getElementById('level-display');
+        const scoreDisplay = document.getElementById('score-display');
+
+        // Función para barajar un array (algoritmo Fisher-Yates)
+        function shuffleArray(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // Iniciar una nueva partida de 10 niveles al azar
+        function startNewGame() {
+            // Hacemos una copia de todas las oraciones, las mezclamos y seleccionamos 10
+            const shuffled = shuffleArray([...allSentences]);
+            currentSessionSentences = shuffled.slice(0, 10);
+            
+            currentLevel = 0;
+            score = 0;
+            scoreDisplay.innerText = score;
+            
+            // Asegurarnos de limpiar botones extra si los hubiera
+            const replayBtn = document.getElementById('btn-replay');
+            if (replayBtn) replayBtn.remove();
+
+            btnReset.style.display = 'inline-block';
+            initLevel();
+        }
+
+        // Initialize Level
+        function initLevel() {
+            wordBank.innerHTML = '';
+            dropZone.innerHTML = '';
+            feedback.innerText = '';
+            btnNext.style.display = 'none';
+            btnCheck.style.display = 'inline-block';
+            levelDisplay.innerText = currentLevel + 1;
+            wordsData = [];
+
+            const sentence = currentSessionSentences[currentLevel];
+            // Dividimos por espacios para crear las palabras sueltas y las desordenamos
+            const words = sentence.split(' ').sort(() => Math.random() - 0.5);
+
+            const bankRect = wordBank.getBoundingClientRect();
+
+            words.forEach((word, index) => {
+                const el = document.createElement('div');
+                el.className = 'word-card in-bank';
+                el.id = 'word-' + index;
+                el.draggable = true;
+                el.innerText = word;
+                
+                el.style.backgroundColor = pastelColors[index % pastelColors.length];
+                
+                el.addEventListener('dragstart', handleDragStart);
+                el.addEventListener('dragend', handleDragEnd);
+
+                wordBank.appendChild(el);
+
+                const width = el.offsetWidth;
+                const height = el.offsetHeight;
+                
+                const x = Math.random() * Math.max(1, bankRect.width - width);
+                const y = Math.random() * Math.max(1, bankRect.height - height);
+                
+                const speedMulti = 1.5 + Math.random() * 1.5;
+                const vx = (Math.random() > 0.5 ? 1 : -1) * speedMulti;
+                const vy = (Math.random() > 0.5 ? 1 : -1) * speedMulti;
+
+                wordsData.push({ id: el.id, el, x, y, vx, vy, width, height });
+            });
+
+            if (!animationFrameId) {
+                animate();
+            }
+        }
+
+        // Animation Loop
+        function animate() {
+            const bankRect = wordBank.getBoundingClientRect();
+
+            wordsData.forEach(w => {
+                if (w.el.parentElement !== wordBank || w.el.dataset.dragging === 'true') {
+                    return;
+                }
+
+                w.x += w.vx;
+                w.y += w.vy;
+
+                if (w.x <= 0) { 
+                    w.x = 0; 
+                    w.vx = Math.abs(w.vx); 
+                }
+                if (w.y <= 0) { 
+                    w.y = 0; 
+                    w.vy = Math.abs(w.vy); 
+                }
+                if (w.x + w.width >= bankRect.width) { 
+                    w.x = Math.max(0, bankRect.width - w.width); 
+                    w.vx = -Math.abs(w.vx); 
+                }
+                if (w.y + w.height >= bankRect.height) { 
+                    w.y = Math.max(0, bankRect.height - w.height); 
+                    w.vy = -Math.abs(w.vy); 
+                }
+
+                w.el.style.transform = `translate(${w.x}px, ${w.y}px)`;
+            });
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // --- Drag and Drop Handlers ---
+        
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.id);
+            e.target.dataset.dragging = 'true';
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
+        function handleDragEnd(e) {
+            e.target.dataset.dragging = 'false';
+            e.target.classList.remove('dragging');
+        }
+
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const id = e.dataTransfer.getData('text/plain');
+            const el = document.getElementById(id);
+            
+            if (el) {
+                const afterElement = getDragAfterElement(dropZone, e.clientX);
+                if (afterElement == null) {
+                    dropZone.appendChild(el);
+                } else {
+                    dropZone.insertBefore(el, afterElement);
+                }
+
+                el.className = 'word-card in-drop-zone';
+                el.style.transform = 'none';
+            }
+        });
+
+        wordBank.addEventListener('dragover', e => {
+            e.preventDefault();
+        });
+
+        wordBank.addEventListener('drop', e => {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text/plain');
+            const el = document.getElementById(id);
+            
+            if (el && el.parentElement !== wordBank) {
+                wordBank.appendChild(el);
+                el.className = 'word-card in-bank';
+                
+                const data = wordsData.find(w => w.id === id);
+                if (data) {
+                    const rect = wordBank.getBoundingClientRect();
+                    data.x = e.clientX - rect.left - (data.width / 2);
+                    data.y = e.clientY - rect.top - (data.height / 2);
+                }
+            }
+        });
+
+        function getDragAfterElement(container, x) {
+            const draggableElements = [...container.querySelectorAll('.word-card:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = x - box.left - box.width / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // --- Button Logic ---
+
+        btnCheck.addEventListener('click', () => {
+            const droppedWords = Array.from(dropZone.querySelectorAll('.word-card'));
+            const currentAnswer = droppedWords.map(w => w.innerText).join(' ');
+            const correctAnswer = currentSessionSentences[currentLevel];
+
+            if (currentAnswer === correctAnswer) {
+                feedback.innerText = "🌟 Great Job! That's correct! 🌟";
+                feedback.style.color = "#2e7d32";
+                
+                score += 10;
+                scoreDisplay.innerText = score;
+                
+                btnCheck.style.display = 'none';
+                btnNext.style.display = 'inline-block';
+            } else {
+                feedback.innerText = "Oops! That's not quite right. Try again!";
+                feedback.style.color = "#d32f2f";
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            wordsData.forEach(w => {
+                if (w.el.parentElement !== wordBank) {
+                    wordBank.appendChild(w.el);
+                    w.el.className = 'word-card in-bank';
+                    
+                    const bankRect = wordBank.getBoundingClientRect();
+                    w.x = (bankRect.width / 2) - (w.width / 2);
+                    w.y = (bankRect.height / 2) - (w.height / 2);
+                }
+            });
+            feedback.innerText = "";
+        });
+
+        btnNext.addEventListener('click', () => {
+            currentLevel++;
+            if (currentLevel < currentSessionSentences.length) {
+                initLevel();
+            } else {
+                wordBank.innerHTML = '';
+                dropZone.innerHTML = '';
+                feedback.innerText = "🎉 You completed all 10 levels! 🎉";
+                feedback.style.color = "#ff4081";
+                btnNext.style.display = 'none';
+                btnCheck.style.display = 'none';
+                btnReset.style.display = 'none';
+                
+                const replayBtn = document.createElement('button');
+                replayBtn.className = 'btn-check';
+                replayBtn.id = 'btn-replay';
+                replayBtn.innerText = 'Play Again';
+                replayBtn.onclick = startNewGame;
+                
+                document.querySelector('.controls').appendChild(replayBtn);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            const bankRect = wordBank.getBoundingClientRect();
+            wordsData.forEach(w => {
+                if (w.x + w.width > bankRect.width) w.x = Math.max(0, bankRect.width - w.width);
+                if (w.y + w.height > bankRect.height) w.y = Math.max(0, bankRect.height - w.height);
+            });
+        });
+
+        // Iniciar el juego por primera vez
+        startNewGame();
+    </script>
+</body>
+</html>
